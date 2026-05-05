@@ -52,8 +52,7 @@ TEST_CASE("HashTable basic operations", "[unit]") {
 
 
 const size_t N_MAX = 1000000;          // максимальное количество элементов
-const size_t STEP = 5000;             // шаг увеличения N
-const size_t REPEAT_MEASURE = 5;      // повторений для усреднения
+const size_t STEP = 2500;             // шаг увеличения N
 const size_t FIXED_CAPACITY = N_MAX;   // фикс. число корзин
 
 
@@ -73,77 +72,72 @@ std::vector<int> generate_keys(size_t count) {
 
 
 double measure_insert_sorted(size_t N) {
-    double total = 0.0;
-    for (size_t r = 0; r < REPEAT_MEASURE; ++r) {
-        HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
-        auto keys = generate_keys(N);
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int k : keys) {
-            ht.insert(k, std::to_string(k));
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        total += elapsed.count() / N;
+
+    HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
+    auto keys = generate_keys(N);
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int k : keys) {
+        ht.insert(k, std::to_string(k));
     }
-    return total / REPEAT_MEASURE;
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    double total = elapsed.count() / N; //среднее время одной операции
+    
+    return total;
 }
 
 double measure_insert_unsorted(size_t N) {
-    double total = 0.0;
-    for (size_t r = 0; r < REPEAT_MEASURE; ++r) {
-        HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
-        auto keys = generate_keys(N);
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int k : keys) {
-            ht.insert(k, std::to_string(k));
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        total += elapsed.count() / N;
+    
+    HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
+    auto keys = generate_keys(N);
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int k : keys) {
+        ht.insert(k, std::to_string(k));
     }
-    return total / REPEAT_MEASURE;
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    double total = elapsed.count() / N; //среднее время одной операции
+    
+    return total;
 }
 
 
 double measure_find_sorted(size_t N) {
-    double total = 0.0;
-    for (size_t r = 0; r < REPEAT_MEASURE; ++r) {
-        HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
-        auto keys = generate_keys(N);
-        
-        for (int k : keys) {
-            ht.insert(k, std::to_string(k));
-        }
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int k : keys) {
-            std::string value;
-            bool found = ht.find(k, value);
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        total += elapsed.count() / N;
+    
+    HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
+    auto keys = generate_keys(N); 
+    for (int k : keys) {
+        ht.insert(k, std::to_string(k));
     }
-    return total / REPEAT_MEASURE;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int k : keys) {
+        std::string value;
+        bool found = ht.find(k, value);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    double total = elapsed.count() / N; //среднее время одной операции
+    
+    return total;
 }
 
 double measure_find_unsorted(size_t N) {
-    double total = 0.0;
-    for (size_t r = 0; r < REPEAT_MEASURE; ++r) {
-        HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
-        auto keys = generate_keys(N);
-        for (int k : keys) {
-            ht.insert(k, std::to_string(k));
-        }
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int k : keys) {
-            std::string value;
-            bool found = ht.find(k, value);
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        total += elapsed.count() / N;
+
+    HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
+    auto keys = generate_keys(N);
+    for (int k : keys) {
+        ht.insert(k, std::to_string(k));
     }
-    return total / REPEAT_MEASURE;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int k : keys) {
+        std::string value;
+        bool found = ht.find(k, value);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    double total = elapsed.count() / N; //среднее время одной операции
+    
+    return total;
 }
 
 TEST_CASE("insertion performance (sorted vs unsorted)", "[insert_benchmark]") {
@@ -174,7 +168,7 @@ TEST_CASE("find performance (sorted vs unsorted)", "[find_benchmark]") {
     std::vector<size_t> sizes;
     std::vector<double> find_unsorted, find_sorted;
 
-    for (size_t N = 10000; N <= 100000; N += STEP) {
+    for (size_t N = 50000; N <= 100000; N += STEP) {
         sizes.push_back(N);
         double unSortedTime = measure_find_unsorted(N);
         double sortedTime  = measure_find_sorted(N);

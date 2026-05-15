@@ -67,37 +67,55 @@ bool HashTable::find(const int key, std::string &value) const {
 
 void HashTable::remove(const int key) {
     size_t id = hash_function(key);
-    bool removeFlag = false;
-    
-    for (auto it = table[id].begin(); it != table[id].end();) {
+    size_t erased = 0;
+    for (auto it = table[id].begin(); it != table[id].end(); ) {
         if (it->first == key) {
             it = table[id].erase(it);
-            removeFlag = true;
-        }
-        else {
+            ++erased;
+        } else {
             ++it;
         }
-    }        
-    
-    if (table[id].empty() && removeFlag) {
-        --_filled;
     }
+    _filled -= erased;
 }
  
-
 std::string& HashTable::operator[](const int key) {
-    size_t id = hash_function(key);
-
-    for (auto it = table[id].begin(); it != table[id].end(); ++it) {
-        if (it->first == key) {
-            return it->second;
-        }
+    if (getLoadFactor() > 0.75) {
+        resize();  
     }
 
-    table[id].push_back({key, ""});
-    _filled++;
-    return table[id].back().second;
+    size_t id = hash_function(key);
+
+    switch (_typeHT) {
+        case TypeHashTable::Sorted: {
+            auto& chain = table[id];
+        
+            auto it = chain.begin();
+            while (it != chain.end() && it->first < key) {
+                ++it;
+            }
+            if (it != chain.end() && it->first == key) {
+                return it->second;          
+            }
+            
+            it = chain.insert(it, {key, ""});
+            ++_filled;
+            return it->second;
+        }
+        default: { // UnSorted
+            for (auto& p : table[id]) {
+                if (p.first == key) {
+                    return p.second;
+                }
+            }
+
+            table[id].push_front({key, ""});
+            ++_filled;
+            return table[id].front().second;
+        }
+    }
 }
+
 
 double HashTable::getLoadFactor() const {
     if (_capacity == 0) {
@@ -108,16 +126,18 @@ double HashTable::getLoadFactor() const {
 }
 
 void HashTable::resize() noexcept {
-        _capacity = _capacity * 2;
-        std::vector<std::list<std::pair<int, std::string>>> newTable(_capacity);
-        
-        for (int i = 0; i < table.size(); ++i) {
-            for (auto it = table[i].begin(); it != table[i].end(); ++it) {
-                newTable[i].push_front(*it);
-            }
-        }
+    size_t new_capacity = _capacity * 2;
+    std::vector<std::list<std::pair<int, std::string>>> newTable(new_capacity);
 
-        table = std::move(newTable);
+    for (size_t i = 0; i < table.size(); ++i) {
+        for (const auto& pair : table[i]) {
+            size_t new_index = hash_function(pair.first); 
+            newTable[new_index].push_front(pair);
+        }
+    }
+
+    table = std::move(newTable);
+    _capacity = new_capacity; 
 }
 
 void HashTable::clear() {

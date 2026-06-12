@@ -8,17 +8,22 @@
 #include <string>
 #include <cstdlib>
 #include <ctime>
-#include <cmath>
 #include <unordered_set>
+#include <algorithm>   
+
+
+const size_t FIXED_CAPACITY = 1024;   
+const size_t STEP          = 500;      // шаг увеличения N
+const size_t MAX_N         = 30000;    // максимальный размер набора данных
+const int    REPETITIONS   = 10;       // число повторных замеров для усреднения
+
 
 TEST_CASE("HashTable basic operations", "[unit]") {
-    HashTable ht(100);   
-    int32_t capacity = 0;
+    HashTable ht(100);
 
     SECTION("Insert and find") {
         ht.insert(42, "answer");
-        ++capacity;
-        REQUIRE(ht.getLoadFactor() == 1.0/100.0);
+        REQUIRE(ht.getLoadFactor() == 1.0 / 100.0);
         std::string value;
         REQUIRE(ht.find(42, value));
         REQUIRE(value == "answer");
@@ -31,11 +36,9 @@ TEST_CASE("HashTable basic operations", "[unit]") {
 
     SECTION("Remove existing key") {
         ht.insert(1, "one");
-        ++capacity;
         ht.remove(1);
         std::string value;
-        --capacity;
-        REQUIRE(ht.getLoadFactor() == capacity/100.0);
+        REQUIRE(ht.getLoadFactor() == 0.0);   
         REQUIRE(!ht.find(1, value));
     }
 
@@ -52,113 +55,79 @@ TEST_CASE("HashTable basic operations", "[unit]") {
 }
 
 
-const size_t STEP = 25;             // шаг увеличения N
-const size_t FIXED_CAPACITY = 1024;   // фикс. число корзин
-
 std::vector<int> generate_keys(size_t count) {
     static bool seeded = false;
     if (!seeded) {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
         seeded = true;
     }
-    
+
     std::unordered_set<int> unique_keys;
     unique_keys.reserve(count);
-    
     while (unique_keys.size() < count) {
         int key = 1 + (std::rand() % (count * 10));
         unique_keys.insert(key);
     }
-    
-    std::vector<int> keys(unique_keys.begin(), unique_keys.end());
-    // Можно дополнительно перемешать, т.к. порядок в unordered_set не определён
-    return keys;
+    return std::vector<int>(unique_keys.begin(), unique_keys.end());
 }
 
 
-double measure_insert_sorted(size_t N) {
-
-    HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
-    auto keys = generate_keys(N);
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int k : keys) {
-        ht.insert(k, "value");
+double measure_insert(TypeHashTable type, size_t N, const std::vector<int>& keys) {
+    double total_time = 0.0;
+    for (int rep = 0; rep < REPETITIONS; ++rep) {
+        HashTable ht(FIXED_CAPACITY, type);
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int k : keys) {
+            ht.insert(k, "value");
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        total_time += elapsed.count();
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    double total = elapsed.count() / N; //среднее время одной операции
-    
-    return total;
+   
+    return total_time / (N * REPETITIONS);
 }
 
-double measure_insert_unsorted(size_t N) {
-    
-    HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
-    auto keys = generate_keys(N);
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int k : keys) {
-        ht.insert(k, "value");
+// Измеряет среднее время поиска ОДНОГО элемента (в секундах) для заданного N и типа таблицы
+double measure_find(TypeHashTable type, size_t N, const std::vector<int>& keys) {
+    double total_time = 0.0;
+    for (int rep = 0; rep < REPETITIONS; ++rep) {
+        HashTable ht(FIXED_CAPACITY, type);
+        
+        for (int k : keys) {
+            ht.insert(k, "value");
+        }
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int k : keys) {
+            std::string value;
+            bool found = ht.find(k, value);
+            (void)found; 
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        total_time += elapsed.count();
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    double total = elapsed.count() / N; //среднее время одной операции
-    
-    return total;
+    return total_time / (N * REPETITIONS);
 }
 
-
-double measure_find_sorted(size_t N) {
-    
-    HashTable ht(FIXED_CAPACITY, TypeHashTable::Sorted);
-    auto keys = generate_keys(N); 
-    for (int k : keys) {
-        ht.insert(k, "value");
-    }
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int k : keys) {
-        std::string value;
-        bool found = ht.find(k, value);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    double total = elapsed.count() / N; //среднее время одной операции
-    
-    return total;
-}
-
-double measure_find_unsorted(size_t N) {
-
-    HashTable ht(FIXED_CAPACITY, TypeHashTable::UnSorted);
-    auto keys = generate_keys(N);
-    for (int k : keys) {
-        ht.insert(k, "value");
-    }
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int k : keys) {
-        std::string value;
-        bool found = ht.find(k, value);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    double total = elapsed.count() / N; //среднее время одной операции
-    
-    return total;
-}
-
-TEST_CASE("insertion performance (sorted vs unsorted)", "[insert_benchmark]") {
+TEST_CASE("Insert performance (sorted vs unsorted)", "[insert_benchmark]") {
     std::vector<size_t> sizes;
     std::vector<double> insert_unsorted, insert_sorted;
 
-    for (size_t N = 100; N <= 300; N += STEP) {
+
+    for (size_t N = 1000; N <= MAX_N; N += STEP) {
+        auto keys = generate_keys(N);
         sizes.push_back(N);
-        double unSortedTime = measure_insert_unsorted(N);
-        double sortedTime  = measure_insert_sorted(N);
+
+        double unSortedTime = measure_insert(TypeHashTable::UnSorted, N, keys);
+        double sortedTime   = measure_insert(TypeHashTable::Sorted,   N, keys);
+
         insert_unsorted.push_back(unSortedTime);
         insert_sorted.push_back(sortedTime);
 
         std::cout << "N = " << N
-                  << " | Insert unsorted: " << unSortedTime * 1e6 << " microseconds"
-                  << " | Insert sorted:   " << sortedTime * 1e6 << " microseconds\n";
+                  << " | Insert unsorted: " << unSortedTime * 1e6 << " µs"
+                  << " | Insert sorted:   " << sortedTime * 1e6 << " µs\n";
     }
 
     std::ofstream file("insert_comparison.csv");
@@ -169,20 +138,23 @@ TEST_CASE("insertion performance (sorted vs unsorted)", "[insert_benchmark]") {
     std::cout << "Insert results saved to insert_comparison.csv\n";
 }
 
-TEST_CASE("find performance (sorted vs unsorted)", "[find_benchmark]") {
+TEST_CASE("Find performance (sorted vs unsorted)", "[find_benchmark]") {
     std::vector<size_t> sizes;
     std::vector<double> find_unsorted, find_sorted;
 
-    for (size_t N = 100; N <= 300; N += STEP) {
+    for (size_t N = 1000; N <= MAX_N; N += STEP) {
+        auto keys = generate_keys(N);
         sizes.push_back(N);
-        double unSortedTime = measure_find_unsorted(N);
-        double sortedTime  = measure_find_sorted(N);
+
+        double unSortedTime = measure_find(TypeHashTable::UnSorted, N, keys);
+        double sortedTime   = measure_find(TypeHashTable::Sorted,   N, keys);
+
         find_unsorted.push_back(unSortedTime);
         find_sorted.push_back(sortedTime);
 
         std::cout << "N = " << N
-                  << " | Find unsorted: " << unSortedTime * 1e6 << " microseconds"
-                  << " | Find sorted:   " << sortedTime * 1e6 << " microseconds\n";
+                  << " | Find unsorted: " << unSortedTime * 1e6 << " µs"
+                  << " | Find sorted:   " << sortedTime * 1e6 << " µs\n";
     }
 
     std::ofstream file("find_comparison.csv");

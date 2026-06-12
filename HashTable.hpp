@@ -14,7 +14,7 @@ enum class TypeHashTable
 class HashTable 
 {
 public:
-    explicit HashTable(size_t size = 100, TypeHashTable typeHT = TypeHashTable::UnSorted) noexcept;
+    explicit HashTable(size_t size = 100, TypeHashTable typeHT = TypeHashTable::UnSorted);
 
     ~HashTable();
     // Если при вставке обнаруживается, что LoadFactor таблицы превышает 0.75, то таблица расширяется в 2 раза.
@@ -29,15 +29,15 @@ public:
     // Занятость хеш-таблицы. Считается как отношение количества занятых ячеек к вместимости хеш-таблицы.
     double getLoadFactor() const;
 
-    void resize() noexcept;
+    void resize();
 
     void clear();
 
     void print() const;
 
 private:
-    int32_t _capacity;  // Вместимость хеш-таблицы
-    int32_t _filled;    // Текущее количество занятых ячеек хеш-таблицы
+    int64_t _capacity;  // Вместимость хеш-таблицы
+    int64_t _filled;    // Текущее количество занятых ячеек хеш-таблицы
 
     TypeHashTable _typeHT;
 

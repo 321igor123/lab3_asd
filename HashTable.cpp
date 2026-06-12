@@ -2,7 +2,7 @@
 #include <cmath>
 #include <iostream>
 
-HashTable::HashTable(size_t size, TypeHashTable typeHT) noexcept
+HashTable::HashTable(size_t size, TypeHashTable typeHT)
                     : _capacity(size), _filled(0), _typeHT(typeHT) {
     table.resize(_capacity);
 }
@@ -18,16 +18,16 @@ void HashTable::insert(const int key, const std::string& value)
     switch (_typeHT) {
         case TypeHashTable::Sorted: {
             auto& chain = table[id];
-            // Ищем позицию для вставки или замены
+            
             auto it = chain.begin();
             while (it != chain.end() && it->first < key) {
                 ++it;
             }
             if (it != chain.end() && it->first == key) {
-                it->second = value;  // замена
+                it->second = value;  
                 return;
             }
-            chain.insert(it, kVPair);  // вставка перед it (сохраняя порядок)
+            chain.insert(it, kVPair);  
             ++_filled;
             break;
         }
@@ -80,39 +80,56 @@ void HashTable::remove(const int key) {
 }
  
 std::string& HashTable::operator[](const int key) {
-    if (getLoadFactor() > 0.75) {
-        resize();  
-    }
-
     size_t id = hash_function(key);
 
-    switch (_typeHT) {
-        case TypeHashTable::Sorted: {
-            auto& chain = table[id];
-        
-            auto it = chain.begin();
-            while (it != chain.end() && it->first < key) {
-                ++it;
-            }
-            if (it != chain.end() && it->first == key) {
-                return it->second;          
-            }
-            
-            it = chain.insert(it, {key, ""});
-            ++_filled;
+   
+    if (_typeHT == TypeHashTable::Sorted) {
+        auto& chain = table[id];
+        auto it = chain.begin();
+        while (it != chain.end() && it->first < key)
+            ++it;
+        if (it != chain.end() && it->first == key)
             return it->second;
-        }
-        default: { // UnSorted
-            for (auto& p : table[id]) {
-                if (p.first == key) {
-                    return p.second;
-                }
-            }
+    } else { // UnSorted
+        for (auto& p : table[id])
+            if (p.first == key)
+                return p.second;
+    }
 
-            table[id].push_front({key, ""});
-            ++_filled;
-            return table[id].front().second;
+    
+    if (_typeHT == TypeHashTable::Sorted) {
+        auto& chain = table[id];
+        auto it = chain.begin();
+        while (it != chain.end() && it->first < key)
+            ++it;
+        it = chain.insert(it, {key, ""});
+        ++_filled;
+
+        
+        if (getLoadFactor() > 0.75) {
+            resize(); 
+            
+            size_t new_id = hash_function(key);
+            auto& new_chain = table[new_id];
+            auto new_it = new_chain.begin();
+            while (new_it != new_chain.end() && new_it->first < key)
+                ++new_it;
+            
+            return new_it->second;
         }
+        return it->second;   
+    } else { // UnSorted
+        table[id].push_front({key, ""});
+        ++_filled;
+
+        if (getLoadFactor() > 0.75) {
+            resize();
+            size_t new_id = hash_function(key);
+            for (auto& p : table[new_id])
+                if (p.first == key)
+                    return p.second;
+        }
+        return table[id].front().second; 
     }
 }
 
@@ -125,23 +142,32 @@ double HashTable::getLoadFactor() const {
     return static_cast<double>(_filled)/static_cast<double>(_capacity);
 }
 
-void HashTable::resize() noexcept {
+void HashTable::resize() {                    
     size_t new_capacity = _capacity * 2;
     std::vector<std::list<std::pair<int, std::string>>> newTable(new_capacity);
-
+    
+    _capacity = new_capacity;                  
+    
     for (size_t i = 0; i < table.size(); ++i) {
         for (const auto& pair : table[i]) {
-            size_t new_index = hash_function(pair.first); 
-            newTable[new_index].push_front(pair);
+            size_t new_index = hash_function(pair.first);
+            newTable[new_index].push_front(pair);   
         }
     }
-
+    
+    
+    if (_typeHT == TypeHashTable::Sorted) {
+        for (auto& bucket : newTable) {
+            bucket.sort();   
+        }
+    }
+    
     table = std::move(newTable);
-    _capacity = new_capacity; 
 }
 
 void HashTable::clear() {
-    table.clear();
+    for (auto& bucket : table)
+        bucket.clear();
     _filled = 0;
 }
 
@@ -158,16 +184,14 @@ void HashTable::print() const {
 }
 
 size_t HashTable::hash_function(const int key) const {
-   /* uint32_t hash = static_cast<uint32_t>(key);
-    hash ^= (hash >> 10) ^ (hash >> 6);
-
-    return (hash ^ (hash >> 4) ^ (hash >> 2)) % _capacity;*/
-    size_t h = static_cast<size_t>(key);
-    h = (h ^ 61) ^ (h >> 16);
-    h = h + (h << 3);
-    h = h ^ (h >> 4);
-    h = h * 0x27d4eb2d;
-    h = h ^ (h >> 15);
-    return h % _capacity;
+    
+    uint64_t h = static_cast<uint64_t>(key);
+    
+    
+    h ^= (h >> 10) ^ (h >> 6);
+    h ^= (h >> 4) ^ (h >> 2);
+    
+    
+    return static_cast<size_t>(h) % _capacity;
 }
 
